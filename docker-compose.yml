@@ -1,0 +1,54 @@
+version: '3.8'
+services:
+    postgres:
+        image: postgres:13
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+            - PGDATA=/var/lib/postgresql/data/airflow/
+    initialize:
+        image: apache/airflow:2.0.0
+        entrypoint: ./scripts/init.sh
+        depends_on:
+            - postgres
+        environment:
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+            - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+        volumes:
+            - ./logs:/opt/airflow/logs
+            - ./scripts:/opt/airflow/scripts
+    scheduler:
+        image: apache/airflow:2.0.0
+        command: scheduler
+        deploy:
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - postgres
+            - initialize
+        environment:
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+            - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+        volumes:
+            - ./dags:/opt/airflow/dags
+            - ./logs:/opt/airflow/logs
+    webserver:
+        image: apache/airflow:2.0.0
+        command: webserver
+        deploy:
+            restart_policy:
+                condition: on-failure
+        depends_on:
+            - postgres
+            - initialize
+            - scheduler
+        environment:
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+            - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+        volumes:
+            - ./dags:/opt/airflow/dags
+            - ./logs:/opt/airflow/logs
+            - ./scripts:/opt/airflow/scripts
+        ports:
+            - "8080:8080"
